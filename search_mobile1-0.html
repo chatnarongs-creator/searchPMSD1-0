@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Excel Search App</title>
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PMSD Search">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/732/732220.png">
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --safe-area-top: env(safe-area-inset-top);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* ลบแถบสีเวลาแตะบน iOS */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            padding: calc(var(--safe-area-top) + 20px) 15px 40px 15px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 25px 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .upload-section, .filter-section, .results-section {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        /* ปรับปรุงปุ่มให้กดง่ายด้วยนิ้วมือ (Touch Target) */
+        .upload-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+        }
+
+        button {
+            min-height: 50px; /* ขนาดมาตรฐาน iOS */
+            border: none;
+            border-radius: 15px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.97);
+            opacity: 0.8;
+        }
+
+        .btn-primary { background: var(--primary-color); color: white; width: 100%; }
+        .btn-secondary { background: #f0f2f5; color: #333; flex: 1; }
+        .btn-danger { background: #ff6b6b; color: white; flex: 1; }
+        .btn-search { background: #34c759; color: white; width: 100%; margin-top: 10px; }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* Filter Grid สำหรับ Mobile */
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        select, .search-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 15px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            font-size: 16px !important; /* ป้องกัน Auto-zoom */
+            background-color: #f9f9f9;
+        }
+
+        /* Table Responsive */
+        .table-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 12px;
+            border: 1px solid #eee;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #eee;
+            white-space: nowrap;
+        }
+
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .results-count { font-weight: bold; color: var(--primary-color); }
+
+        .message {
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+
+        #filterSection, #resultsSection { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 PMSD Search</h1>
+            <p style="color: #888; font-size: 0.9rem;">เครื่องมือค้นหาข้อมูล Excel บนมือถือ</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-group">
+                <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                <button class="btn-primary" onclick="loadFile()">📂 โหลดไฟล์ข้อมูล</button>
+                <div class="button-row">
+                    <button class="btn-danger" onclick="resetAll()">🔄 รีเซ็ต</button>
+                </div>
+            </div>
+            <div id="uploadMessage"></div>
+        </div>
+
+        <div class="filter-section" id="filterSection">
+            <h3 style="margin-bottom: 15px;">🔍 ค้นหาและตัวกรอง</h3>
+            <input type="text" id="searchText" class="search-input" placeholder="พิมพ์เพื่อค้นหาทุกคอลัมน์..." onkeyup="handleSearchKeyup(event)">
+            
+            <div class="filter-grid" id="dynamicFilters">
+                </div>
+            
+            <button class="btn-search" onclick="applyFilters()">🔎 เริ่มค้นหา</button>
+            <button class="btn-secondary" style="width: 100%; margin-top: 8px;" onclick="clearFilters()">🗑️ ล้างตัวกรอง</button>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <div class="results-header">
+                <div class="results-count" id="resultsCount">0 รายการ</div>
+                <button onclick="exportToExcel()" style="background: #007aff; color: white; padding: 5px 15px; min-height: 35px; font-size: 14px;">📥 Export</button>
+            </div>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let excelData = [];
+        let filteredData = [];
+        const columns = ['Order Date', 'Close Order Date', 'Costsheet', 'Opportunity Id', 'SSS Order', 'Non-mobile', 'CA Name', 'Site Name',
